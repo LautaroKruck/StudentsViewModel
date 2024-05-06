@@ -1,31 +1,26 @@
-import androidx.compose.desktop.ui.tooling.preview.Preview
-import androidx.compose.material.Button
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.window.Window
+
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.window.application
-
-@Composable
-@Preview
-fun App() {
-    var text by remember { mutableStateOf("Hello, World!") }
-
-    MaterialTheme {
-        Button(onClick = {
-            text = "Hello, Desktop!"
-        }) {
-            Text(text)
-        }
-    }
-}
+import androidx.compose.ui.unit.dp
+import java.io.File
 
 fun main() = application {
-    Window(onCloseRequest = ::exitApplication) {
-        App()
-    }
+
+    val icon = painterResource("sample.png")
+    val windowState = GetWindowState(
+        windowWidth = 800.dp,
+        windowHeight = 800.dp
+    )
+    val fileManagement = FileManagement()
+    val studentsFile = File("studentList.txt")
+
+    MainWindowStudents(
+        title = "My Students",
+        icon = icon,
+        windowState = windowState,
+        resizable = false,
+        fileManagement = fileManagement,
+        studentsFile = studentsFile,
+        onCloseMainWindow = { exitApplication() }
+    )
 }
