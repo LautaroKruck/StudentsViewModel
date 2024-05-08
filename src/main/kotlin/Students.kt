@@ -72,149 +72,69 @@ fun GetWindowState(
         position = WindowPosition(positionX.dp, positionY.dp)
     )
 }
-@Composable
-fun StudentScreen(
-    viewModel : StudentsViewModel
-) {
-    val newStudent by viewModel.newStudent
 
-    AddNewStudent(
-        newStudent = newStudent,
-        focusRequester = newStudentFocusRequester,
-        onNewStudentChange = { name -> viewModel.newStudentChange(name) },
-        onButtonAddNewStudentClick = {
-            viewModel.addStudent()
-            newStudentFocusRequester.requestFocus()
-        }
-    )
-
-}
-@Composable
 @Preview
-fun StudentScreen(
-    fileManagement: IFiles,
-    studentsFile: File,
-) {
-    val maxCharacters = 10
-    val maxNumStudentsVisible = 7
-
-    val (newStudent, setNewStudent) = remember { mutableStateOf("") }
-    val studentsState = remember { mutableStateListOf<String>() }
+@Composable
+fun StudentScreen(viewModel: StudentsViewModel) {
+    val newStudent by viewModel.newStudent
+    val students by viewModel.students
+    val infoMessage by viewModel.infoMessage
+    val showInfoMessage by viewModel.showInfoMessage
 
     val newStudentFocusRequester = remember { FocusRequester() }
     val studentListFocusRequester = remember { FocusRequester() }
 
-    val (infoMessage, setInfoMessage) = remember { mutableStateOf("") }
-    val (showInfoMessage, setShowInfoMessage) = remember { mutableStateOf(false) }
-
-    val showImgScrollStudentList = remember { derivedStateOf { studentsState.size > maxNumStudentsVisible } }
-
-    val (selectedIndex, setSelectedIndex) = remember { mutableStateOf(-1) } // -1 significa que no hay selección
-
-    LaunchedEffect(key1 = true) {  // key1 = true asegura que esto se ejecute solo una vez
-        // Carga inicial de datos desde un archivo
-        val loadedStudents = fileManagement.leer(studentsFile)
-        if (loadedStudents != null) {
-            studentsState.addAll(loadedStudents)
-        } else {
-            setInfoMessage("No se pudieron cargar los datos de los estudiantes.")
-            setShowInfoMessage(true)
-        }
-    }
-
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        Row(
-            modifier = Modifier.fillMaxSize().weight(3f),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            AddNewStudent(
-                newStudent = newStudent,
-                focusRequester = newStudentFocusRequester,
-                onNewStudentChange = {
-                    if (it.length <= maxCharacters) {
-                        setNewStudent(it)
-                    }
-                },
-                onButtonAddNewStudentClick = {
-                    if (newStudent.isNotBlank()) {
-                        studentsState.add(newStudent.trim())
-                        setNewStudent("")
-                    }
-                    newStudentFocusRequester.requestFocus()
-                }
-            )
-            Row(
-                verticalAlignment = Alignment.Bottom
-            ) {
-                StudentList(
-                    studentsState = studentsState,
-                    selectedIndex = selectedIndex,
-                    focusRequester = studentListFocusRequester,
-                    onStudentSelected = { index -> setSelectedIndex(index) },
-                    onIconDeleteStudentClick = { studentsState.removeAt(it) }
-                ) {
-                    studentsState.clear()
-                }
-                ImageUpDownScroll(
-                    showImgScrollStudentList = showImgScrollStudentList.value,
-                )
-            }
-        }
-        SaveChangesButton(
-            modifier = Modifier.fillMaxSize().weight(1f),
-            onButtonSaveChangesClick = {
-                var error = ""
-                val newStudentsFile = fileManagement.crearFic(studentsFile.absolutePath)
-                if (newStudentsFile != null) {
-                    for (student in studentsState) {
-                        error = fileManagement.escribir(studentsFile, "$student\n")
-                        if (error.isNotEmpty()) {
-                            break
-                        }
-                    }
-                    if (error.isNotEmpty()) {
-                        setInfoMessage(error)
-                    } else {
-                        setInfoMessage("Fichero guardado correctamente")
-                    }
-                } else {
-                    setInfoMessage("No se pudo generar el fichero studentList.txt")
-                }
-                setShowInfoMessage(true)
-            }
-        )
-    }
-
-    // Gestión de la visibilidad del mensaje informativo
-    if (showInfoMessage) {
-        InfoMessage(
-            message = infoMessage,
-            onDismiss = {
-                setShowInfoMessage(false)
-                setInfoMessage("")
-                newStudentFocusRequester.requestFocus()
-            }
-        )
-    }
-
-    // Solicitar el foco solo cuando cambia el tamaño de la lista
-    LaunchedEffect(studentsState.size) {
+    // LaunchedEffect para cargar estudiantes al iniciar y manejar el foco inicial
+    LaunchedEffect(key1 = Unit) {
         newStudentFocusRequester.requestFocus()
     }
 
-    // Automáticamente oculta el mensaje después de un retraso
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        AddNewStudent(
+            newStudent = newStudent,
+            onNewStudentChange = viewModel::newStudentChange,
+            onAddStudent = {
+                viewModel.addStudent()
+                newStudentFocusRequester.requestFocus()  // Restablecer el foco al campo de entrada
+            },
+            focusRequester = newStudentFocusRequester
+        )
+        Spacer(Modifier.height(8.dp))
+        StudentList(
+            students = students,
+            onDeleteStudent = viewModel::deleteStudent,
+            onClearAll = viewModel::clearAllStudents,
+            onDoubleClick = viewModel::selectStudent, // Suponiendo que agregas soporte para doble clic
+            selectedIndex = viewModel.selectedStudentIndex.value
+        )
+        EditStudentDialog(viewModel = viewModel)
+
+        if (showInfoMessage) {
+            InfoMessage(
+                message = infoMessage,
+                onDismiss = {
+                    viewModel.clearInfoMessage()
+                    newStudentFocusRequester.requestFocus()
+                }
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        SaveChangesButton(
+            onSaveChanges = {
+                viewModel.saveStudents()
+            }
+        )
+    }
+
+    // Efecto para manejar el mensaje informativo temporal
     LaunchedEffect(showInfoMessage) {
         if (showInfoMessage) {
             delay(2000)
-            setShowInfoMessage(false)
-            setInfoMessage("")
-            newStudentFocusRequester.requestFocus()
+            viewModel.clearInfoMessage()
         }
     }
 }
+
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -460,6 +380,33 @@ fun InfoMessage(message: String, onDismiss: () -> Unit) {
             modifier = Modifier.fillMaxSize().padding(16.dp)
         ) {
             Text(message)
+        }
+    }
+}
+
+@Composable
+fun EditStudentDialog(viewModel: StudentsViewModel) {
+    if (viewModel.editMode.value) {
+        Dialog(onDismissRequest = { viewModel.cancelEdit() }) {
+            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Edit Student Name", style = MaterialTheme.typography.h6)
+                Spacer(modifier = Modifier.height(8.dp))
+                TextField(
+                    value = viewModel.editText.value,
+                    onValueChange = { viewModel._editText.value = it },
+                    singleLine = true
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row {
+                    Button(onClick = { viewModel.saveEditedStudent() }) {
+                        Text("Save")
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = { viewModel.cancelEdit() }) {
+                        Text("Cancel")
+                    }
+                }
+            }
         }
     }
 }
